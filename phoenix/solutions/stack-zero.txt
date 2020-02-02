@@ -22,7 +22,6 @@ https://exploit.education/phoenix/stack-zero/
 
 char *gets(char *);
 
-
 // To run phoneix just run ./boot-exploit-education-phoenix-amd64.sh
 // to connect, ssh -p2222 user@localhost password is user
 // Challenges are in /opt/
