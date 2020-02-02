@@ -1,0 +1,66 @@
+https://exploit.education/phoenix/stack-zero/
+
+/*
+ * phoenix/stack-zero, by https://exploit.education
+ *
+ * The aim is to change the contents of the changeme variable.
+ *
+ * Scientists have recently discovered a previously unknown species of
+ * kangaroos, approximately in the middle of Western Australia. These
+ * kangaroos are remarkable, as their insanely powerful hind legs give them
+ * the ability to jump higher than a one story house (which is approximately
+ * 15 feet, or 4.5 metres), simply because houses can't can't jump.
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define BANNER \
+  "Welcome to " LEVELNAME ", brought to you by https://exploit.education"
+
+char *gets(char *);
+
+
+// To run phoneix just run ./boot-exploit-education-phoenix-amd64.sh
+// to connect, ssh -p2222 user@localhost password is user
+// Challenges are in /opt/
+// QEMU: ctrl+alt+g to leave
+// gdb useful help system:
+// Examine command:
+//      gdb x help
+// Info command:
+//      gdb info help
+//      gdb info proc help
+// Break into address:
+//      b *0x00273127
+//      b *main+5
+// disassemble main
+// set assembly-flavor
+// set hook
+
+// Solution: python -c "print("a"*65) | ./stack-zero
+
+int main(int argc, char **argv) {
+  struct {
+    char buffer[64];
+    volatile int changeme;
+  } locals;
+
+  printf("%s\n", BANNER);
+
+  locals.changeme = 0;
+  gets(locals.buffer);
+
+  if (locals.changeme != 0) {
+    puts("Well done, the 'changeme' variable has been changed!");
+  } else {
+    puts(
+        "Uh oh, 'changeme' has not yet been changed. Would you like to try "
+        "again?");
+  }
+
+  exit(0);
+}
+
