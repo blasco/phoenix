@@ -1,0 +1,76 @@
+/*
+ * phoenix/format-zero, by https://exploit.education
+ *
+ * Can you change the "changeme" variable?
+ *
+ * 0 bottles of beer on the wall, 0 bottles of beer! You take one down, and
+ * pass it around, 4294967295 bottles of beer on the wall!
+ */
+
+#include <err.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define BANNER \
+  "Welcome to " LEVELNAME ", brought to you by https://exploit.education"
+
+int main(int argc, char **argv) {
+  struct {
+    char dest[32];
+    volatile int changeme;
+  } locals;
+  char buffer[16];
+
+  printf("%s\n", BANNER);
+
+  if (fgets(buffer, sizeof(buffer) - 1, stdin) == NULL) {
+    errx(1, "Unable to get buffer");
+  }
+  buffer[15] = 0;
+
+  locals.changeme = 0;
+
+  sprintf(locals.dest, buffer);
+
+  if (locals.changeme != 0) {
+    puts("Well done, the 'changeme' variable has been changed!");
+  } else {
+    puts(
+        "Uh oh, 'changeme' has not yet been changed. Would you like to try "
+        "again?");
+  }
+
+  exit(0);
+}
+
+// If we check:
+//     man 3 printf
+
+//        n      The number of characters written so far is stored into the inte‐
+//               ger  pointed  to  by  the corresponding argument.  That argument
+//               shall be an int *, or variant whose size  matches  the  (option‐
+//               ally)  supplied  integer  length  modifier.  No argument is con‐
+//               verted.  (This specifier is not supported by the  bionic  C  li‐
+//               brary.)   The behavior is undefined if the conversion specifica‐
+//               tion includes any flags, a field width, or a precision.
+
+//     BUGS
+//            Because  sprintf()  and  vsprintf()  assume an arbitrarily long string,
+//            callers must be careful not to overflow the actual space; this is often
+//            impossible  to assure.  Note that the length of the strings produced is
+//            locale-dependent and difficult to  predict.   Use  snprintf()  and  vs‐
+//            nprintf() instead (or asprintf(3) and vasprintf(3)).
+
+//        Code  such as printf(foo); often indicates a bug, since foo may contain
+//        a % character.  If foo comes from untrusted user input, it may  contain
+//        %n,  causing  the printf() call to write to memory and creating a secu‐
+//        rity hole.
+
+Solution:
+
+char buffer[16] but we need to overflow char dest[32];
+Nevertheless, %x is 2 characters but it expands into 8 chars,
+
+To overflow 32 chars, we write padding = "%p%p%p%p" + "new_val"
